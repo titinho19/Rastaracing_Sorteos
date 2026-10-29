@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RastaRacing GP | Simulador de Carreras & Sorteos en Vivo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Orbitron (Futurista/HUD) & Rajdhani (Telemetría) -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:ital,wght@0,500;0,700;0,900;1,800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --rasta-green: #00ff66;
+            --rasta-yellow: #ffcc00;
+            --rasta-red: #ff1e38;
+            --twitch-purple: #9146ff;
+            --dark-bg: #07080c;
+            --panel-bg: rgba(14, 17, 26, 0.85);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: #ffffff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(0, 255, 102, 0.08) 0%, transparent 35%),
+                radial-gradient(circle at 85% 25%, rgba(145, 70, 255, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 50% 85%, rgba(255, 30, 56, 0.08) 0%, transparent 40%),
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+        }
+
+        .font-hud {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Borde degradado Rasta */
+        .rasta-border-top {
+            border-top: 3px solid transparent;
+            border-image: linear-gradient(90deg, var(--rasta-green), var(--rasta-yellow), var(--rasta-red), var(--twitch-purple)) 1;
+        }
+
+        /* Efecto Cristal / Telemetría */
+        .hud-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Pista de carreras con asfalto animado */
+        .race-track-container {
+            position: relative;
+            background: #0b0d13;
+            border-top: 4px solid #1f2433;
+            border-bottom: 4px solid #1f2433;
+            overflow: hidden;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.9);
+        }
+
+        /* Pianos estilo circuito WEC Rasta */
+        .curb-strip {
+            height: 10px;
+            width: 100%;
+            background: repeating-linear-gradient(
+                -45deg,
+                var(--rasta-green),
+                var(--rasta-green) 20px,
+                var(--rasta-yellow) 20px,
+                var(--rasta-yellow) 40px,
+                var(--rasta-red) 40px,
+                var(--rasta-red) 60px,
+                #111 60px,
+                #111 80px
+            );
+            background-size: 226px 100%;
+        }
+
+        .track-moving .curb-strip {
+            animation: moveTrack 0.35s linear infinite;
+        }
+
+        .track-moving .lane-divider {
+            animation: moveTrack 0.25s linear infinite;
+        }
+
+        @keyframes moveTrack {
+            from { background-position-x: 0; }
+            to { background-position-x: -226px; }
+        }
+
+        /* Carril individual */
+        .race-lane {
+            position: relative;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+        }
+
+        /* Línea de meta */
+        .finish-line {
+            position: absolute;
+            right: 5%;
+            top: 0;
+            bottom: 0;
+            width: 26px;
+            z-index: 5;
+            background-image: 
+                linear-gradient(45deg, #fff 25%, transparent 25%), 
+                linear-gradient(-45deg, #fff 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #fff 75%), 
+                linear-gradient(-45deg, transparent 75%, #fff 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+            background-color: #000;
+            box-shadow: 0 0 25px rgba(0, 255, 102, 0.5);
+        }
+
+        /* Coche Hypercar SVG Contenedor */
+        .car-wrapper {
+            position: absolute;
+            left: 1%;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            transition: transform 0.1s linear;
+            will-change: left;
+        }
+
+        /* Estela Nitro / DRS */
+        .nitro-flame {
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            filter: drop-shadow(0 0 8px var(--rasta-green));
+        }
+        .car-boosting .nitro-flame {
+            opacity: 1;
+            animation: flicker 0.08s infinite alternate;
+        }
+
+        @keyframes flicker {
+            0% { transform: scaleX(0.9) scaleY(0.95); }
+            100% { transform: scaleX(1.35) scaleY(1.1); }
+        }
+
+        /* Semáforo F1/WEC */
+        .gantry-light {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #1a1d26;
+            border: 2px solid #2e3446;
+            transition: all 0.15s ease;
+        }
+        .gantry-light.red-on {
+            background: #ff1e38;
+            box-shadow: 0 0 25px #ff1e38, inset 0 0 10px #fff;
+            border-color: #ff6b7b;
+        }
+        .gantry-light.green-on {
+            background: #00ff66;
+            box-shadow: 0 0 30px #00ff66, inset 0 0 10px #fff;
+            border-color: #80ffb3;
+        }
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0c12; }
+        ::-webkit-scrollbar-thumb { background: #262b3d; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--rasta-green); }
+
+        /* Animación Podio */
+        .podium-pillar {
+            transition: height 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- ================= NAVBAR OFICIAL RASTARACING ================= -->
+    <header class="sticky top-0 z-40 hud-panel rasta-border-top border-b border-white/10">
+        <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <!-- Logo & Título -->
+            <div class="flex items-center gap-3">
+                <div class="relative w-11 h-11 rounded-lg bg-gradient-to-br from-[#00ff66] via-[#ffcc00] to-[#ff1e38] p-[2px] shadow-[0_0_15px_rgba(0,255,102,0.4)]">
+                    <div class="w-full h-full bg-[#090b10] rounded-[6px] flex items-center justify-center">
+                        <i class="fa-solid fa-flag-checkered text-xl text-[#00ff66]"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-hud font-black text-xl tracking-wider uppercase bg-clip-text text-transparent bg-gradient-to-r from-[#00ff66] via-[#ffcc00] to-[#ff1e38]">
+                            RASTARACING
+                        </span>
+                        <span class="text-xs font-hud px-2 py-0.5 rounded bg-[#9146ff]/20 border border-[#9146ff] text-[#c49bff] font-bold">
+                            RACE SIMULATOR
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-400 tracking-wide">TELEMETRÍA HIPERCAR EN VIVO & SORTEOS DE COMUNIDAD</p>
+                </div>
+            </div>
+
+            <!-- Redes Sociales y Directo -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                <a href="https://www.twitch.tv/rastaracing" target="_blank" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#9146ff] hover:bg-[#7c2cf5] text-white font-bold text-sm transition shadow-[0_0_15px_rgba(145,70,255,0.4)]">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    <i class="fa-brands fa-twitch"></i>
+                    <span>Directo en Twitch</span>
+                </a>
+                <a href="https://discord.com/invite/VdT6Wncxup" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5865F2]/20 hover:bg-[#5865F2]/40 border border-[#5865F2]/50 text-white text-sm font-semibold transition">
+                    <i class="fa-brands fa-discord text-[#5865F2]"></i>
+                    <span class="hidden sm:inline">Discord</span>
+                </a>
+                <a href="https://www.youtube.com/@rastaracing_oficial" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 border border-red-500/50 text-white text-sm font-semibold transition">
+                    <i class="fa-brands fa-youtube text-red-500"></i>
+                    <span class="hidden sm:inline">YouTube</span>
+                </a>
+                <a href="https://www.instagram.com/racing.rasta/" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-600/20 hover:bg-pink-600/40 border border-pink-500/50 text-white text-sm font-semibold transition">
+                    <i class="fa-brands fa-instagram text-pink-400"></i>
+                    <span class="hidden sm:inline">Instagram</span>
+                </a>
+                <a href="https://www.instant-gaming.com/es/?igr=rastaig" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#ff5400] to-[#ff1e38] hover:brightness-110 text-white text-sm font-bold transition shadow-[0_0_12px_rgba(255,84,0,0.4)]">
+                    <i class="fa-solid fa-gamepad"></i>
+                    <span>Instant Gaming</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= WORKSPACE PRINCIPAL ================= -->
+    <main class="max-w-[1600px] w-full mx-auto px-4 py-6 flex-grow">
+        
+        <!-- Cabecera de Estado / Semáforo y Controles de Carrera -->
+        <div class="hud-panel rounded-2xl p-4 mb-6 border border-white/10 flex flex-wrap items-center justify-between gap-4">
+            
+            <!-- Semáforo Oficial -->
+            <div class="flex items-center gap-4">
+                <div class="bg-[#050608] px-4 py-2.5 rounded-xl border border-white/10 flex items-center gap-2.5 shadow-inner">
+                    <div id="light-1" class="gantry-light"></div>
+                    <div id="light-2" class="gantry-light"></div>
+                    <div id="light-3" class="gantry-light"></div>
+                    <div id="light-4" class="gantry-light"></div>
+                    <div id="light-5" class="gantry-light"></div>
+                </div>
+                <div>
+                    <div class="text-xs uppercase tracking-widest text-gray-400 font-semibold">DIRECTOR DE CARRERA</div>
+                    <div id="race-status-text" class="font-hud font-bold text-lg text-[#00ff66]">PARRILLA ABIERTA - ESPERANDO PILOTOS</div>
+                </div>
+            </div>
+
+            <!-- Telemetría Central (Líder y Crono) -->
+            <div class="flex items-center gap-6 bg-black/50 px-5 py-2 rounded-xl border border-white/5">
+                <div>
+                    <div class="text-[11px] text-gray-400 uppercase tracking-wider">CRONÓMETRO OFICIAL</div>
+                    <div id="race-timer" class="font-hud text-2xl font-black text-white tracking-wider">00.000s</div>
+                </div>
+                <div class="h-8 w-[1px] bg-white/10"></div>
+                <div>
+                    <div class="text-[11px] text-gray-400 uppercase tracking-wider">LÍDER EN PISTA</div>
+                    <div id="current-leader" class="font-hud text-lg font-bold text-[#ffcc00] truncate max-w-[180px]">---</div>
+                </div>
+                <div class="h-8 w-[1px] bg-white/10 hidden sm:block"></div>
+                <div class="hidden sm:block">
+                    <div class="text-[11px] text-gray-400 uppercase tracking-wider">VELOCIDAD PUNTA</div>
+                    <div id="top-speed-hud" class="font-hud text-lg font-bold text-[#00ff66]">0 KM/H</div>
+                </div>
+            </div>
+
+            <!-- Botones de Acción de Carrera -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2">
+                    <i class="fa-solid fa-gauge-high text-[#ffcc00]"></i>
+                    <select id="race-duration" class="bg-transparent text-sm font-bold text-white focus:outline-none cursor-pointer">
+                        <option value="sprint" class="bg-[#0e111a]">Sprint Rápido (~8s)</option>
+                        <option value="standard" selected class="bg-[#0e111a]">GP Estándar (~14s)</option>
+                        <option value="endurance" class="bg-[#0e111a]">Le Mans Emoción (~22s)</option>
+                    </select>
+                </div>
+
+                <button id="btn-start-race" onclick="startRaceSequence()" class="px-6 py-3 rounded-xl font-hud font-black text-sm uppercase tracking-wider bg-gradient-to-r from-[#00ff66] to-[#00b84c] text-black hover:brightness-110 transition shadow-[0_0_25px_rgba(0,255,102,0.5)] flex items-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-play"></i>
+                    <span>LANZAR CARRERA</span>
+                </button>
+
+                <button id="btn-reset-race" onclick="resetTrack()" class="px-4 py-3 rounded-xl font-hud font-bold text-sm uppercase bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-2 cursor-pointer" title="Reiniciar posiciones">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Grid Principal: Panel de Pilotos (Izquierda) + Circuito & Telemetría (Derecha) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- COLUMNA IZQUIERDA (3 cols): GESTIÓN MANUAL DE PILOTOS -->
+            <div class="lg:col-span-3 hud-panel rounded-2xl p-5 border border-white/10 flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div>
+                        <h2 class="font-hud font-bold text-base text-white flex items-center gap-2">
+                            <i class="fa-solid fa-users-gear text-[#00ff66]"></i>
+                            <span>INSCRIPCIÓN MANUAL</span>
+                        </h2>
+                        <p class="text-xs text-gray-400">Añade los nombres del chat de Twitch</p>
+                    </div>
+                    <span id="driver-count-badge" class="font-hud text-xs font-bold px-2.5 py-1 rounded-full bg-[#00ff66]/20 text-[#00ff66] border border-[#00ff66]/40">
+                        6 Pilotos
+                    </span>
+                </div>
+
+                <!-- Añadir 1 piloto rápido -->
+                <div class="flex gap-2">
+                    <input type="text" id="single-driver-input" placeholder="Nombre del espectador / piloto..." 
+                        class="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#00ff66]"
+                        onkeydown="if(event.key==='Enter') addSingleDriver()">
+                    <button onclick="addSingleDriver()" class="px-4 py-2 rounded-xl bg-[#00ff66] hover:bg-[#00cc52] text-black font-bold text-sm transition flex items-center gap-1 shrink-0">
+                        <i class="fa-solid fa-plus"></i> Añadir
+                    </button>
+                </div>
+
+                <!-- Pegar lista masiva -->
+                <div class="bg-black/40 rounded-xl p-3 border border-white/5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-bold text-gray-300 uppercase tracking-wider">Pegar lista (1 por línea o coma)</label>
+                        <button onclick="loadPresetDrivers()" class="text-[11px] text-[#ffcc00] hover:underline font-semibold">
+                            <i class="fa-solid fa-bolt"></i> Cargar Demo
+                        </button>
+                    </div>
+                    <textarea id="bulk-drivers-input" rows="3" placeholder="Ejemplo:&#10;Rasta_Boss&#10;SpeedyGonzales&#10;ValkyrieLMU" 
+                        class="w-full bg-black/70 border border-white/10 rounded-lg p-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#ffcc00] resize-none"></textarea>
+                    <button onclick="addBulkDrivers()" class="mt-2 w-full py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-white uppercase tracking-wider transition">
+                        <i class="fa-solid fa-file-import mr-1 text-[#ffcc00]"></i> Importar Nombres a la Pista
+                    </button>
+                </div>
+
+                <!-- Opciones de Sorteo -->
+                <div class="flex items-center justify-between bg-[#9146ff]/10 border border-[#9146ff]/30 rounded-xl px-3.5 py-2.5">
+                    <label for="remove-winner-toggle" class="text-xs font-semibold text-gray-200 cursor-pointer flex items-center gap-2">
+                        <i class="fa-solid fa-trophy text-[#ffcc00]"></i>
+                        <span>Eliminar ganador tras carrera</span>
+                    </label>
+                    <input type="checkbox" id="remove-winner-toggle" class="w-4 h-4 accent-[#00ff66] cursor-pointer">
+                </div>
+
+                <!-- Lista de pilotos en parrilla -->
+                <div>
+                    <div class="flex items-center justify-between text-xs text-gray-400 mb-2">
+                        <span>PARRILLA DE SALIDA ACTUAL</span>
+                        <div class="flex gap-2">
+                            <button onclick="shuffleDrivers()" class="hover:text-[#00ff66] transition" title="Mezclar orden de salida">
+                                <i class="fa-solid fa-shuffle"></i> Mezclar
+                            </button>
+                            <span class="text-white/20">|</span>
+                            <button onclick="clearAllDrivers()" class="hover:text-[#ff1e38] transition" title="Borrar todos">
+                                <i class="fa-solid fa-trash-can"></i> Vaciar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="drivers-list-container" class="max-h-[340px] overflow-y-auto space-y-1.5 pr-1">
+                        <!-- Generado dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMNA DERECHA (9 cols): PISTA FUTURISTA + TELEMETRÍA EN VIVO -->
+            <div class="lg:col-span-9 flex flex-col gap-6">
+                
+                <!-- Contenedor del Circuito -->
+                <div id="track-wrapper" class="hud-panel rounded-2xl overflow-hidden border border-white/15 shadow-2xl">
+                    <!-- Barra superior de la pista -->
+                    <div class="bg-[#0a0d14] px-5 py-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/10">
+                        <div class="flex items-center gap-3">
+                            <span class="px-2.5 py-0.5 rounded bg-[#ff1e38] text-white font-hud font-bold text-xs uppercase animate-pulse">LIVE TELEMETRY</span>
+                            <span class="font-hud text-sm font-bold text-gray-200 tracking-wide">CIRCUITO DE LA SARTHE // SECTOR CYBER-RASTA</span>
+                        </div>
+                        <div class="flex items-center gap-4 text-xs font-semibold text-gray-400">
+                            <span><i class="fa-solid fa-bolt text-[#00ff66] mr-1"></i>ZONA DRS & HYPER-BOOST ACTIVA</span>
+                            <span><i class="fa-solid fa-flag-checkered text-white mr-1"></i>META AL 95%</span>
+                        </div>
+                    </div>
+
+                    <!-- Piano Superior -->
+                    <div class="curb-strip"></div>
+
+                    <!-- Pista con Carriles Dinámicos -->
+                    <div id="race-lanes-box" class="race-track-container min-h-[320px] max-h-[560px] overflow-y-auto py-2 relative">
+                        <!-- Línea de Salida -->
+                        <div class="absolute left-[75px] top-0 bottom-0 w-[2px] bg-white/20 z-0"></div>
+                        
+                        <!-- Marcadores de Sectores -->
+                        <div class="absolute left-[35%] top-0 bottom-0 w-[1px] border-l border-dashed border-[#00ff66]/20 z-0 pointer-events-none flex flex-col justify-between py-1">
+                            <span class="text-[9px] font-hud text-[#00ff66]/50 pl-1">SECTOR 1</span>
+                        </div>
+                        <div class="absolute left-[65%] top-0 bottom-0 w-[1px] border-l border-dashed border-[#ffcc00]/20 z-0 pointer-events-none flex flex-col justify-between py-1">
+                            <span class="text-[9px] font-hud text-[#ffcc00]/50 pl-1">SECTOR 2 (DRS)</span>
+                        </div>
+
+                        <!-- Línea de Meta -->
+                        <div class="finish-line"></div>
+
+                        <!-- Carriles generados por JS -->
+                        <div id="lanes-render-area" class="relative z-10"></div>
+                    </div>
+
+                    <!-- Piano Inferior -->
+                    <div class="curb-strip"></div>
+                </div>
+
+                <!-- Panel Inferior: Narrador de Carrera en Vivo + Top 5 Clasificación en Tiempo Real -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <!-- Radio de Dirección de Carrera (Feed en vivo) -->
+                    <div class="md:col-span-7 hud-panel rounded-2xl p-4 border border-white/10">
+                        <div class="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+                            <span class="font-hud text-xs font-bold uppercase tracking-wider text-[#ffcc00] flex items-center gap-2">
+                                <i class="fa-solid fa-tower-broadcast animate-pulse"></i>
+                                RADIO DIRECCIÓN DE CARRERA & EVENTOS
+                            </span>
+                            <span class="text-[11px] text-gray-500">ACTUALIZACIÓN EN TIEMPO REAL</span>
+                        </div>
+                        <div id="race-commentary" class="h-28 overflow-y-auto space-y-1.5 text-sm pr-2 font-medium">
+                            <div class="text-gray-400">🏁 Sistema de telemetría RastaRacing listo. Añade a los participantes y pulsa <span class="text-[#00ff66] font-bold">Lanzar Carrera</span>.</div>
+                        </div>
+                    </div>
+
+                    <!-- Torre de Tiempos Top 5 en Vivo -->
+                    <div class="md:col-span-5 hud-panel rounded-2xl p-4 border border-white/10">
+                        <div class="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+                            <span class="font-hud text-xs font-bold uppercase tracking-wider text-[#00ff66] flex items-center gap-2">
+                                <i class="fa-solid fa-ranking-star"></i>
+                                TORRE DE POSICIONES (TOP 5)
+                            </span>
+                            <span class="text-[11px] text-gray-500">GAP / ESTADO</span>
+                        </div>
+                        <div id="live-standings-board" class="space-y-1.5 text-xs">
+                            <!-- Se actualiza en cada frame -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ================= SECCIÓN PARTNERS & APOYO AL CANAL ================= -->
+        <section class="mt-12 pt-8 border-t border-white/10">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                <div>
+                    <h3 class="font-hud font-black text-xl uppercase tracking-wider text-white flex items-center gap-2">
+                        <span class="w-2 h-6 bg-gradient-to-b from-[#00ff66] via-[#ffcc00] to-[#ff1e38] rounded-full inline-block"></span>
+                        APOYA AL CANAL & PARTNERS OFICIALES RASTARACING
+                    </h3>
+                    <p class="text-sm text-gray-400">Tus compras y registros desde estos enlaces ayudan directamente a mantener los campeonatos y sorteos del canal.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <!-- Partner 1: Instant Gaming -->
+                <div class="hud-panel rounded-2xl p-5 border border-[#ff5400]/40 hover:border-[#ff5400] transition flex flex-col justify-between relative overflow-hidden group">
+                    <div class="absolute -right-8 -top-8 w-28 h-28 bg-[#ff5400]/10 rounded-full blur-xl group-hover:bg-[#ff5400]/20 transition"></div>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 rounded-md bg-[#ff5400]/20 text-[#ff7733] font-hud font-bold text-xs">PARTNER OFICIAL</span>
+                            <i class="fa-solid fa-fire-flame-curved text-2xl text-[#ff5400]"></i>
+                        </div>
+                        <h4 class="font-hud font-bold text-lg text-white mb-1">Juegos más baratos en Instant Gaming</h4>
+                        <p class="text-sm text-gray-300 mb-4">¡Si quieres ayudar al canal, compra tus juegos de PC, DLCs de Le Mans Ultimate y tarjetas prepago usando nuestro enlace oficial!</p>
+                    </div>
+                    <a href="https://www.instant-gaming.com/es/?igr=rastaig" target="_blank" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#ff5400] to-[#ff1e38] text-white font-hud font-bold text-xs uppercase tracking-wider text-center hover:brightness-110 transition shadow-lg">
+                        <i class="fa-solid fa-cart-shopping mr-1.5"></i> Comprar con Enlace RastaIG
+                    </a>
+                </div>
+
+                <!-- Partner 2: Promoción iRacing Referido -->
+                <div class="hud-panel rounded-2xl p-5 border border-[#00ff66]/40 hover:border-[#00ff66] transition flex flex-col justify-between relative overflow-hidden group">
+                    <div class="absolute -right-8 -top-8 w-28 h-28 bg-[#00ff66]/10 rounded-full blur-xl group-hover:bg-[#00ff66]/20 transition"></div>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 rounded-md bg-[#00ff66]/20 text-[#00ff66] font-hud font-bold text-xs">PROMOCIÓN SIMRACING</span>
+                            <i class="fa-solid fa-flag-checkered text-2xl text-[#00ff66]"></i>
+                        </div>
+                        <h4 class="font-hud font-bold text-lg text-white mb-1">Promoción Oficial iRacing + Referido</h4>
+                        <p class="text-sm text-gray-300 mb-3">¿Te das de alta en iRacing? Usa el enlace promocional y pon el correo del canal como referido al crear tu cuenta:</p>
+                        <div class="flex items-center justify-between bg-black/60 border border-white/15 rounded-lg px-3 py-1.5 mb-3">
+                            <code class="text-xs text-[#ffcc00] font-bold">rastaracing83@gmail.com</code>
+                            <button onclick="copyReferralEmail()" id="copy-email-btn" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white font-semibold transition">
+                                <i class="fa-regular fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    <a href="https://www.iracing.com/usac/" target="_blank" class="w-full py-2.5 px-4 rounded-xl bg-[#00ff66] text-black font-hud font-bold text-xs uppercase tracking-wider text-center hover:bg-[#00cc52] transition">
+                        <i class="fa-solid fa-arrow-up-right-from-square mr-1.5"></i> Ir a Promoción iRacing
+                    </a>
+                </div>
+
+                <!-- Partner 3: Comunidad & Contacto -->
+                <div class="hud-panel rounded-2xl p-5 border border-[#9146ff]/40 hover:border-[#9146ff] transition flex flex-col justify-between relative overflow-hidden group">
+                    <div class="absolute -right-8 -top-8 w-28 h-28 bg-[#9146ff]/10 rounded-full blur-xl group-hover:bg-[#9146ff]/20 transition"></div>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 rounded-md bg-[#9146ff]/20 text-[#c49bff] font-hud font-bold text-xs">COMUNIDAD & CONTACTO</span>
+                            <i class="fa-solid fa-headset text-2xl text-[#9146ff]"></i>
+                        </div>
+                        <h4 class="font-hud font-bold text-lg text-white mb-1">Únete al Paddock de RastaRacing</h4>
+                        <p class="text-sm text-gray-300 mb-3">Entra al Discord oficial para enterarte de todas las carreras de LMU, setups, sorteos y eventos en vivo.</p>
+                        <div class="text-xs text-gray-400 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-envelope text-[#ffcc00]"></i>
+                            <span>Contacto comercial: <strong class="text-white">rastaracing83@gmail.com</strong></span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <a href="https://discord.com/invite/VdT6Wncxup" target="_blank" class="py-2.5 px-3 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white font-hud font-bold text-xs uppercase text-center transition">
+                            <i class="fa-brands fa-discord mr-1"></i> Discord
+                        </a>
+                        <a href="mailto:rastaracing83@gmail.com" class="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-hud font-bold text-xs uppercase text-center transition">
+                            <i class="fa-solid fa-paper-plane mr-1"></i> Email
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ================= MODAL DE PODIO FUTURISTA ================= -->
+    <div id="podium-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="hud-panel max-w-3xl w-full rounded-3xl border-2 border-[#00ff66]/50 p-6 sm:p-8 relative overflow-hidden shadow-[0_0_60px_rgba(0,255,102,0.25)]">
+            <!-- Barra decorativa Rasta -->
+            <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#00ff66] via-[#ffcc00] to-[#ff1e38]"></div>
+
+            <!-- Cabecera del Modal -->
+            <div class="text-center mb-8">
+                <span class="px-3 py-1 rounded-full bg-[#ffcc00]/20 border border-[#ffcc00] text-[#ffcc00] font-hud text-xs font-bold uppercase tracking-widest">
+                    🏁 BANDERA A CUADROS // RESULTADO OFICIAL
+                </span>
+                <h2 class="font-hud font-black text-3xl sm:text-4xl uppercase mt-2 bg-clip-text text-transparent bg-gradient-to-r from-[#00ff66] via-[#ffcc00] to-[#ff1e38]">
+                    CEREMONIA DE PODIO RASTARACING
+                </h2>
+            </div>
+
+            <!-- Escenario de los 3 Ganadores -->
+            <div class="grid grid-cols-3 gap-3 sm:gap-6 items-end pt-6 pb-4 px-2 sm:px-6 bg-black/50 rounded-2xl border border-white/10">
+                
+                <!-- 2º PUESTO -->
+                <div class="flex flex-col items-center text-center">
+                    <div class="text-xs font-hud text-gray-400 mb-1">P2 // PLATA</div>
+                    <div id="podium-name-2" class="font-hud font-bold text-sm sm:text-lg text-white truncate max-w-full px-2 mb-2">---</div>
+                    <div id="podium-time-2" class="text-xs text-gray-400 mb-3 font-mono">+0.000s</div>
+                    <div class="w-full h-28 sm:h-32 rounded-t-2xl bg-gradient-to-t from-slate-800 to-slate-500/40 border-t-4 border-slate-300 flex flex-col items-center justify-center shadow-lg">
+                        <span class="font-hud font-black text-3xl sm:text-4xl text-slate-200">2º</span>
+                    </div>
+                </div>
+
+                <!-- 1º PUESTO (CAMPEÓN) -->
+                <div class="flex flex-col items-center text-center">
+                    <div class="w-10 h-10 rounded-full bg-[#ffcc00]/20 border border-[#ffcc00] flex items-center justify-center text-[#ffcc00] mb-1 animate-bounce">
+                        <i class="fa-solid fa-crown text-lg"></i>
+                    </div>
+                    <div class="text-xs font-hud text-[#ffcc00] font-bold mb-1">CAMPEÓN DE CARRERA</div>
+                    <div id="podium-name-1" class="font-hud font-black text-base sm:text-2xl text-[#00ff66] truncate max-w-full px-2 mb-1 drop-shadow-[0_0_10px_rgba(0,255,102,0.5)]">---</div>
+                    <div id="podium-time-1" class="text-xs text-[#ffcc00] mb-3 font-mono font-bold">00.000s</div>
+                    <div class="w-full h-36 sm:h-44 rounded-t-2xl bg-gradient-to-t from-[#ffcc00]/20 via-[#ffcc00]/40 to-[#00ff66]/40 border-t-4 border-[#ffcc00] flex flex-col items-center justify-center shadow-[0_0_30px_rgba(255,204,0,0.3)]">
+                        <span class="font-hud font-black text-4xl sm:text-5xl text-[#ffcc00]">1º</span>
+                    </div>
+                </div>
+
+                <!-- 3º PUESTO -->
+                <div class="flex flex-col items-center text-center">
+                    <div class="text-xs font-hud text-amber-500 mb-1">P3 // BRONCE</div>
+                    <div id="podium-name-3" class="font-hud font-bold text-sm sm:text-lg text-white truncate max-w-full px-2 mb-2">---</div>
+                    <div id="podium-time-3" class="text-xs text-gray-400 mb-3 font-mono">+0.000s</div>
+                    <div class="w-full h-20 sm:h-24 rounded-t-2xl bg-gradient-to-t from-amber-950 to-amber-700/40 border-t-4 border-amber-500 flex flex-col items-center justify-center shadow-lg">
+                        <span class="font-hud font-black text-2xl sm:text-3xl text-amber-400">3º</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Tabla resumen del resto de pilotos -->
+            <div class="mt-4 bg-black/40 rounded-xl p-3 border border-white/10 max-h-36 overflow-y-auto">
+                <div class="text-xs font-hud text-gray-400 uppercase mb-2">CLASIFICACIÓN COMPLETA FOTO FINISH</div>
+                <div id="full-results-list" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"></div>
+            </div>
+
+            <!-- Botones del Modal -->
+            <div class="mt-6 flex flex-wrap items-center justify-center gap-4">
+                <button onclick="closePodiumAndRepeat()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#00ff66] to-[#00b84c] text-black font-hud font-black text-xs sm:text-sm uppercase tracking-wider hover:brightness-110 transition shadow-lg cursor-pointer">
+                    <i class="fa-solid fa-rotate-right mr-1.5"></i> Nueva Carrera con Mismos Pilotos
+                </button>
+                <button onclick="closePodiumModal()" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-hud font-bold text-xs sm:text-sm uppercase tracking-wider transition cursor-pointer">
+                    Cerrar Podio
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= FOOTER ================= -->
+    <footer class="mt-12 border-t border-white/10 bg-[#050609] py-4 px-4 text-center text-xs text-gray-500">
+        <div class="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+                <span class="font-hud font-bold text-white">RASTARACING</span> — Simulador Oficial de Sorteos y Carreras para Twitch
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="https://www.twitch.tv/rastaracing" target="_blank" class="hover:text-[#9146ff] transition">Twitch</a>
+                <a href="https://discord.com/invite/VdT6Wncxup" target="_blank" class="hover:text-[#5865F2] transition">Discord</a>
+                <a href="https://www.youtube.com/@rastaracing_oficial" target="_blank" class="hover:text-red-500 transition">YouTube</a>
+                <a href="https://www.instagram.com/racing.rasta/" target="_blank" class="hover:text-pink-400 transition">Instagram</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ================= LÓGICA DEL SIMULADOR DE CARRERAS ================= -->
+    <script>
+        // Paleta de colores Hypercar Neón
+        const CAR_COLORS = [
+            { main: '#00ff66', accent: '#004d1f', name: 'Rasta Green' },
+            { main: '#ffcc00', accent: '#665200', name: 'Solar Gold' },
+            { main: '#ff1e38', accent: '#66000c', name: 'Apex Red' },
+            { main: '#9146ff', accent: '#3b0a75', name: 'Twitch Purple' },
+            { main: '#00e5ff', accent: '#004d59', name: 'Cyber Cyan' },
+            { main: '#ff6d00', accent: '#662b00', name: 'Papaya GT' },
+            { main: '#f50057', accent: '#59001f', name: 'Neon Magenta' },
+            { main: '#aeea00', accent: '#3d5200', name: 'Volt Lime' }
+        ];
+
+        // Estado global
+        let drivers = [
+            { id: 1, name: 'RastaRacing_83', number: 83, color: CAR_COLORS[0], progress: 0, speed: 0, finished: false, finishTime: null, boosting: false },
+            { id: 2, name: 'HyperMax_LMU', number: 14, color: CAR_COLORS[1], progress: 0, speed: 0, finished: false, finishTime: null, boosting: false },
+            { id: 3, name: 'Valkyrie_V12', number: 7, color: CAR_COLORS[2], progress: 0, speed: 0, finished: false, finishTime: null, boosting: false },
+            { id: 4, name: 'TwitchSub_Pro', number: 99, color: CAR_COLORS[3], progress: 0, speed: 0, finished: false, finishTime: null, boosting: false },
+            { id: 5, name: 'SartheKing_GT3', number: 51, color: CAR_COLORS[4], progress: 0, speed: 0, finished: false, finishTime: null, boosting: false },
+            { id: 6, name: 'ApexHunter_ES', number: 27, color: CAR_COLORS[5], progress: 0, speed: 0, finished: false, finishTime: null, boosting: false }
+        ];
+
+        let isRacing = false;
+        let raceAnimationFrame = null;
+        let raceStartTime = 0;
+        let finishedOrder = [];
+        let lastLeaderName = '';
+
+        // SVG de un prototipo Hypercar futurista visto de perfil/diagonal
+        function getHypercarSVG(mainColor, accentColor, dorsal) {
+            return `
+            <div class="relative flex items-center">
+                <!-- Llama Nitro / DRS -->
+                <svg class="nitro-flame -mr-2" width="28" height="18" viewBox="0 0 28 18" fill="none">
+                    <path d="M28 9L0 2L6 9L0 16L28 9Z" fill="url(#flameGrad)"/>
+                    <defs>
+                        <linearGradient id="flameGrad" x1="28" y1="9" x2="0" y2="9" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#00ff66"/>
+                            <stop offset="0.5" stop-color="#ffcc00"/>
+                            <stop offset="1" stop-color="#ff1e38" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <!-- Chasis Hypercar -->
+                <svg width="86" height="32" viewBox="0 0 110 40" class="drop-shadow-[0_0_8px_${mainColor}]">
+                    <!-- Alerón trasero y aleta de tiburón WEC -->
+                    <path d="M6 8 L18 8 L22 22 L8 22 Z" fill="${accentColor}" stroke="${mainColor}" stroke-width="1.5"/>
+                    <path d="M18 12 L48 16 L48 22 L18 22 Z" fill="#11151f" stroke="${mainColor}" stroke-width="1"/>
+                    <!-- Cuerpo aerodinámico -->
+                    <path d="M8 24 L24 16 L54 13 L78 18 L105 25 L102 31 L8 31 Z" fill="${mainColor}"/>
+                    <!-- Cúpula cabina -->
+                    <path d="M42 15 L62 15 L74 21 L38 21 Z" fill="#07090e" stroke="#ffffff" stroke-width="1"/>
+                    <!-- Detalles fibra de carbono -->
+                    <path d="M28 24 L78 24 L72 29 L24 29 Z" fill="#0b0e17"/>
+                    <!-- Faro LED delantero -->
+                    <path d="M94 23 L103 25 L96 27 Z" fill="#ffffff"/>
+                    <!-- Luz lluvia WEC trasera -->
+                    <rect x="6" y="24" width="3" height="5" fill="#ff1e38"/>
+                    <!-- Rueda Trasera -->
+                    <circle cx="26" cy="30" r="8" fill="#090b10" stroke="${mainColor}" stroke-width="2"/>
+                    <circle cx="26" cy="30" r="3" fill="#fff"/>
+                    <!-- Rueda Delantera -->
+                    <circle cx="82" cy="30" r="8" fill="#090b10" stroke="${mainColor}" stroke-width="2"/>
+                    <circle cx="82" cy="30" r="3" fill="#fff"/>
+                    <!-- Porta-dorsal luminoso -->
+                    <rect x="44" y="22" width="18" height="8" rx="2" fill="#000" stroke="#fff" stroke-width="0.8"/>
+                    <text x="53" y="28.5" font-family="Orbitron" font-size="6.5" font-weight="900" fill="#fff" text-anchor="middle">${dorsal}</text>
+                </svg>
+            </div>`;
+        }
+
+        // Renderizar lista lateral y carriles de la pista
+        function renderAll() {
+            const listContainer = document.getElementById('drivers-list-container');
+            const lanesArea = document.getElementById('lanes-render-area');
+            const countBadge = document.getElementById('driver-count-badge');
+
+            countBadge.textContent = `${drivers.length} Pilotos`;
+            listContainer.innerHTML = '';
+            lanesArea.innerHTML = '';
+
+            if (drivers.length === 0) {
+                listContainer.innerHTML = `<div class="text-xs text-gray-500 text-center py-6">No hay pilotos en parrilla. Añade nombres arriba para empezar.</div>`;
+                lanesArea.innerHTML = `<div class="h-64 flex items-center justify-center text-gray-500 font-hud text-sm">AÑADE PILOTOS EN EL PANEL IZQUIERDO PARA GENERAR LOS CARRILES</div>`;
+                updateStandingsBoard();
+                return;
+            }
+
+            drivers.forEach((driver, index) => {
+                // 1. Item en el panel izquierdo
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between bg-black/50 hover:bg-black/80 px-3 py-1.5 rounded-lg border border-white/10 transition';
+                item.innerHTML = `
+                    <div class="flex items-center gap-2.5 truncate">
+                        <span class="w-3 h-3 rounded-full shrink-0" style="background:${driver.color.main}; box-shadow: 0 0 8px ${driver.color.main}"></span>
+                        <span class="font-hud text-xs font-bold text-gray-400">#${driver.number}</span>
+                        <span class="text-sm font-bold text-white truncate">${driver.name}</span>
+                    </div>
+                    <button onclick="removeDriver(${driver.id})" class="text-gray-500 hover:text-[#ff1e38] transition ml-2" ${isRacing ? 'disabled' : ''}>
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+                listContainer.appendChild(item);
+
+                // 2. Carril en la pista
+                const lane = document.createElement('div');
+                lane.className = 'race-lane px-3';
+                lane.innerHTML = `
+                    <!-- Número de Carril -->
+                    <div class="w-14 shrink-0 font-hud text-[11px] font-bold text-gray-500 select-none z-10">
+                        P${index + 1} <span class="text-white/40">#${driver.number}</span>
+                    </div>
+                    <!-- Nombre de fondo en el asfalto -->
+                    <div class="absolute left-24 font-hud font-black text-xl uppercase tracking-widest text-white/[0.04] select-none pointer-events-none">
+                        ${driver.name}
+                    </div>
+                    <!-- Coche -->
+                    <div id="car-node-${driver.id}" class="car-wrapper" style="left: 60px;">
+                        ${getHypercarSVG(driver.color.main, driver.color.accent, driver.number)}
+                        <span class="ml-2 px-2 py-0.5 rounded bg-black/80 border border-white/15 font-hud font-bold text-[11px] text-white whitespace-nowrap shadow">
+                            ${driver.name}
+                        </span>
+                    </div>
+                `;
+                lanesArea.appendChild(lane);
+            });
+
+            updateStandingsBoard();
+        }
+
+        // Añadir un solo piloto
+        function addSingleDriver() {
+            if (isRacing) return;
+            const input = document.getElementById('single-driver-input');
+            const name = input.value.trim();
+            if (!name) return;
+
+            pushNewDriver(name);
+            input.value = '';
+            renderAll();
+        }
+
+        // Añadir múltiples pilotos (por salto de línea o coma)
+        function addBulkDrivers() {
+            if (isRacing) return;
+            const textarea = document.getElementById('bulk-drivers-input');
+            const raw = textarea.value.trim();
+            if (!raw) return;
+
+            const names = raw.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
+            names.forEach(name => pushNewDriver(name));
+            textarea.value = '';
+            renderAll();
+            addCommentary(`📥 Se han añadido <strong>${names.length} pilotos</strong> a la parrilla de salida.`);
+        }
+
+        function pushNewDriver(name) {
+            const nextColor = CAR_COLORS[drivers.length % CAR_COLORS.length];
+            const randomDorsal = Math.floor(Math.random() * 90) + 10;
+            drivers.push({
+                id: Date.now() + Math.random(),
+                name: name.substring(0, 22),
+                number: randomDorsal,
+                color: nextColor,
+                progress: 0,
+                speed: 0,
+                finished: false,
+                finishTime: null,
+                boosting: false
+            });
+        }
+
+        function removeDriver(id) {
+            if (isRacing) return;
+            drivers = drivers.filter(d => d.id !== id);
+            renderAll();
+        }
+
+        function clearAllDrivers() {
+            if (isRacing) return;
+            drivers = [];
+            renderAll();
+            addCommentary(`🧹 Parrilla vaciada por Dirección de Carrera.`);
+        }
+
+        function shuffleDrivers() {
+            if (isRacing || drivers.length < 2) return;
+            drivers.sort(() => Math.random() - 0.5);
+            renderAll();
+            addCommentary(`🔀 Parrilla de salida mezclada aleatoriamente.`);
+        }
+
+        function loadPresetDrivers() {
+            if (isRacing) return;
+            drivers = [];
+            const demoNames = ['RastaRacing_83', 'LMU_Legend', 'Hypercar_King', 'Twitch_VIP', 'NitroRasta', 'Sarthe_Boss', 'SpaMaster', 'MonzaRocket'];
+            demoNames.forEach(n => pushNewDriver(n));
+            renderAll();
+            addCommentary(`⚡ Cargados 8 Hypercars de demostración.`);
+        }
+
+        // Añadir mensaje al cuadro de radio
+        function addCommentary(htmlText) {
+            const box = document.getElementById('race-commentary');
+            const entry = document.createElement('div');
+            entry.className = 'text-gray-200 border-l-2 border-[#00ff66] pl-2 py-0.5 text-xs';
+            entry.innerHTML = htmlText;
+            box.prepend(entry);
+        }
+
+        // Actualizar la torre Top 5
+        function updateStandingsBoard() {
+            const board = document.getElementById('live-standings-board');
+            if (drivers.length === 0) {
+                board.innerHTML = `<div class="text-gray-500">Esperando inscripción de pilotos...</div>`;
+                return;
+            }
+
+            const sorted = [...drivers].sort((a, b) => {
+                if (a.finished && b.finished) return a.finishTime - b.finishTime;
+                if (a.finished) return -1;
+                if (b.finished) return 1;
+                return b.progress - a.progress;
+            });
+
+            board.innerHTML = sorted.slice(0, 5).map((d, idx) => {
+                const badgeColor = idx === 0 ? 'bg-[#ffcc00] text-black' : idx === 1 ? 'bg-slate-300 text-black' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-white/10 text-gray-300';
+                const statusText = d.finished ? `${(d.finishTime / 1000).toFixed(3)}s` : `${Math.round(d.progress)}%`;
+                return `
+                <div class="flex items-center justify-between bg-black/50 px-2.5 py-1.5 rounded border border-white/5">
+                    <div class="flex items-center gap-2 truncate">
+                        <span class="w-5 h-5 rounded font-hud font-bold flex items-center justify-center text-[10px] ${badgeColor}">P${idx + 1}</span>
+                        <span class="w-2 h-2 rounded-full" style="background:${d.color.main}"></span>
+                        <span class="font-bold text-white truncate">${d.name}</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        ${d.boosting && !d.finished ? '<span class="px-1.5 py-0.2 rounded bg-[#00ff66]/20 text-[#00ff66] font-hud text-[9px] font-bold">DRS</span>' : ''}
+                        <span class="font-mono text-gray-300 font-bold">${statusText}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Secuencia de Semáforos estilo WEC / F1 y arranque
+        function startRaceSequence() {
+            if (isRacing) return;
+            if (drivers.length < 2) {
+                alert('Añade al menos 2 pilotos en la columna izquierda para iniciar la carrera.');
+                return;
+            }
+
+            resetTrack(false);
+            isRacing = true;
+            document.getElementById('btn-start-race').disabled = true;
+            document.getElementById('btn-start-race').classList.add('opacity-50');
+
+            const statusText = document.getElementById('race-status-text');
+            statusText.textContent = 'SECUENCIA DE SALIDA EN CURSO...';
+            statusText.className = 'font-hud font-bold text-lg text-[#ff1e38]';
+
+            // Encender 5 luces rojas una por una
+            for (let i = 1; i <= 5; i++) {
+                setTimeout(() => {
+                    if (!isRacing) return;
+                    document.getElementById(`light-${i}`).classList.add('red-on');
+                }, i * 550);
+            }
+
+            // Apagar rojas, encender verde y lanzar carrera
+            setTimeout(() => {
+                if (!isRacing) return;
+                for (let i = 1; i <= 5; i++) {
+                    const l = document.getElementById(`light-${i}`);
+                    l.classList.remove('red-on');
+                    l.classList.add('green-on');
+                }
+                statusText.textContent = '¡BANDERA VERDE! CARRERA EN MARCHA';
+                statusText.className = 'font-hud font-bold text-lg text-[#00ff66]';
+                document.getElementById('track-wrapper').classList.add('track-moving');
+                addCommentary(`🟢 <strong>¡SALIDA LANZADA!</strong> Los ${drivers.length} Hypercars aceleran a fondo hacia la primera chicane.`);
+                
+                raceStartTime = performance.now();
+                raceAnimationFrame = requestAnimationFrame(updateRaceLoop);
+            }, 3400);
+        }
+
+        // Bucle principal de físicas y telemetría de la carrera
+        function updateRaceLoop(now) {
+            if (!isRacing) return;
+
+            const elapsed = now - raceStartTime;
+            document.getElementById('race-timer').textContent = (elapsed / 1000).toFixed(3) + 's';
+
+            const durationMode = document.getElementById('race-duration').value;
+            const speedMultiplier = durationMode === 'sprint' ? 0.25 : durationMode === 'standard' ? 0.14 : 0.09;
+
+            const laneContainer = document.getElementById('lanes-render-area');
+            const trackWidth = laneContainer.clientWidth;
+            const startX = 60;
+            const finishX = trackWidth * 0.95 - 110; // Ajuste para el morro del coche
+
+            let maxCurrentSpeed = 290;
+
+            drivers.forEach(driver => {
+                if (driver.finished) return;
+
+                // Probabilidad de activar DRS / Hyper-Boost aleatorio para crear adelantamientos épicos
+                if (Math.random() < 0.035) {
+                    driver.boosting = !driver.boosting;
+                    if (driver.boosting && Math.random() < 0.25) {
+                        addCommentary(`⚡ <strong>${driver.name}</strong> despliega el Hyper-Boost híbrido en recta.`);
+                    }
+                }
+
+                // Cálculo de avance con rubber-banding suave para máxima emoción
+                const baseStep = (Math.random() * 1.35 + 0.45) * speedMultiplier;
+                const boostBonus = driver.boosting ? baseStep * 0.75 : 0;
+                driver.progress += baseStep + boostBonus;
+
+                const simulatedKmh = Math.round(295 + (driver.boosting ? 48 : 15) + Math.random() * 12);
+                if (simulatedKmh > maxCurrentSpeed) maxCurrentSpeed = simulatedKmh;
+
+                // Comprobar si cruza la meta
+                if (driver.progress >= 100) {
+                    driver.progress = 100;
+                    driver.finished = true;
+                    driver.boosting = false;
+                    driver.finishTime = elapsed;
+                    finishedOrder.push(driver);
+
+                    if (finishedOrder.length === 1) {
+                        addCommentary(`🏁 <strong>¡VICTORIA PARA ${driver.name.toUpperCase()}!</strong> Cruza la línea de meta en 1ª posición.`);
+                    }
+                }
+
+                // Actualizar posición DOM del coche
+                const carNode = document.getElementById(`car-node-${driver.id}`);
+                if (carNode) {
+                    const currentX = startX + (driver.progress / 100) * (finishX - startX);
+                    carNode.style.left = `${currentX}px`;
+                    if (driver.boosting) {
+                        carNode.classList.add('car-boosting');
+                    } else {
+                        carNode.classList.remove('car-boosting');
+                    }
+                }
+            });
+
+            // Actualizar HUD de líder y velocidad
+            const sortedLive = [...drivers].sort((a, b) => {
+                if (a.finished && b.finished) return a.finishTime - b.finishTime;
+                if (a.finished) return -1;
+                if (b.finished) return 1;
+                return b.progress - a.progress;
+            });
+
+            if (sortedLive.length > 0) {
+                const currentLeader = sortedLive[0].name;
+                document.getElementById('current-leader').textContent = currentLeader;
+                if (currentLeader !== lastLeaderName && lastLeaderName !== '' && !sortedLive[0].finished) {
+                    addCommentary(`🔥 <strong>¡CAMBIO DE LÍDER!</strong> ${currentLeader} se pone en P1.`);
+                }
+                lastLeaderName = currentLeader;
+            }
+
+            document.getElementById('top-speed-hud').textContent = `${maxCurrentSpeed} KM/H`;
+            updateStandingsBoard();
+
+            // Comprobar si todos han terminado
+            if (finishedOrder.length === drivers.length) {
+                finishRaceCeremony();
+            } else {
+                raceAnimationFrame = requestAnimationFrame(updateRaceLoop);
+            }
+        }
+
+        // Ceremonia final y apertura de Podio
+        function finishRaceCeremony() {
+            isRacing = false;
+            cancelAnimationFrame(raceAnimationFrame);
+            document.getElementById('track-wrapper').classList.remove('track-moving');
+            document.getElementById('btn-start-race').disabled = false;
+            document.getElementById('btn-start-race').classList.remove('opacity-50');
+
+            const statusText = document.getElementById('race-status-text');
+            statusText.textContent = `BANDERA A CUADROS - GANADOR: ${finishedOrder[0].name}`;
+            statusText.className = 'font-hud font-bold text-lg text-[#ffcc00]';
+
+            // Lanzar confeti con colores Rasta
+            confetti({
+                particleCount: 140,
+                spread: 90,
+                origin: { y: 0.6 },
+                colors: ['#00ff66', '#ffcc00', '#ff1e38', '#9146ff']
+            });
+
+            // Rellenar modal de podio
+            const winnerTime = finishedOrder[0].finishTime;
+
+            // P1
+            document.getElementById('podium-name-1').textContent = finishedOrder[0]?.name || '---';
+            document.getElementById('podium-time-1').textContent = `${(winnerTime / 1000).toFixed(3)}s`;
+
+            // P2
+            if (finishedOrder[1]) {
+                document.getElementById('podium-name-2').textContent = finishedOrder[1].name;
+                const gap2 = ((finishedOrder[1].finishTime - winnerTime) / 1000).toFixed(3);
+                document.getElementById('podium-time-2').textContent = `+${gap2}s`;
+            } else {
+                document.getElementById('podium-name-2').textContent = '---';
+                document.getElementById('podium-time-2').textContent = '---';
+            }
+
+            // P3
+            if (finishedOrder[2]) {
+                document.getElementById('podium-name-3').textContent = finishedOrder[2].name;
+                const gap3 = ((finishedOrder[2].finishTime - winnerTime) / 1000).toFixed(3);
+                document.getElementById('podium-time-3').textContent = `+${gap3}s`;
+            } else {
+                document.getElementById('podium-name-3').textContent = '---';
+                document.getElementById('podium-time-3').textContent = '---';
+            }
+
+            // Lista completa
+            const fullList = document.getElementById('full-results-list');
+            fullList.innerHTML = finishedOrder.map((d, idx) => {
+                const gap = idx === 0 ? `${(d.finishTime / 1000).toFixed(3)}s` : `+${((d.finishTime - winnerTime) / 1000).toFixed(3)}s`;
+                return `
+                <div class="flex items-center justify-between bg-white/5 px-2.5 py-1.5 rounded">
+                    <span class="truncate"><strong class="text-[#00ff66] font-hud">P${idx + 1}</strong> ${d.name}</span>
+                    <span class="font-mono text-gray-400 ml-2">${gap}</span>
+                </div>`;
+            }).join('');
+
+            // Si está activado eliminar ganador tras carrera (para sorteos sucesivos)
+            if (document.getElementById('remove-winner-toggle').checked && finishedOrder[0]) {
+                const winnerId = finishedOrder[0].id;
+                drivers = drivers.filter(d => d.id !== winnerId);
+                addCommentary(`🏆 <strong>${finishedOrder[0].name}</strong> ha sido retirado de la parrilla para el siguiente sorteo.`);
+            }
+
+            setTimeout(() => {
+                const modal = document.getElementById('podium-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }, 650);
+        }
+
+        // Reiniciar coches a la salida
+        function resetTrack(renderEverything = true) {
+            isRacing = false;
+            cancelAnimationFrame(raceAnimationFrame);
+            finishedOrder = [];
+            lastLeaderName = '';
+
+            document.getElementById('track-wrapper').classList.remove('track-moving');
+            document.getElementById('btn-start-race').disabled = false;
+            document.getElementById('btn-start-race').classList.remove('opacity-50');
+            document.getElementById('race-timer').textContent = '00.000s';
+            document.getElementById('current-leader').textContent = '---';
+            document.getElementById('top-speed-hud').textContent = '0 KM/H';
+
+            const statusText = document.getElementById('race-status-text');
+            statusText.textContent = 'PARRILLA ABIERTA - ESPERANDO PILOTOS';
+            statusText.className = 'font-hud font-bold text-lg text-[#00ff66]';
+
+            for (let i = 1; i <= 5; i++) {
+                const l = document.getElementById(`light-${i}`);
+                l.classList.remove('red-on', 'green-on');
+            }
+
+            drivers.forEach(d => {
+                d.progress = 0;
+                d.finished = false;
+                d.finishTime = null;
+                d.boosting = false;
+            });
+
+            if (renderEverything) renderAll();
+        }
+
+        function closePodiumModal() {
+            const modal = document.getElementById('podium-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            renderAll();
+        }
+
+        function closePodiumAndRepeat() {
+            closePodiumModal();
+            resetTrack(true);
+            startRaceSequence();
+        }
+
+        // Copiar email de referido iRacing
+        function copyReferralEmail() {
+            navigator.clipboard.writeText('rastaracing83@gmail.com');
+            const btn = document.getElementById('copy-email-btn');
+            btn.innerHTML = '<i class="fa-solid fa-check text-[#00ff66]"></i> ¡Copiado!';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copiar';
+            }, 2000);
+        }
+
+        // Inicializar al abrir
+        window.addEventListener('DOMContentLoaded', () => {
+            renderAll();
+        });
+    </script>
+</body>
+</html>
