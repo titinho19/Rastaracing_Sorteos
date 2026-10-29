@@ -279,9 +279,9 @@
                 <div class="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-3 py-2">
                     <i class="fa-solid fa-gauge-high text-[#ffcc00]"></i>
                     <select id="race-duration" class="bg-transparent text-sm font-bold text-white focus:outline-none cursor-pointer">
-                        <option value="sprint" class="bg-[#0e111a]">Sprint Rápido (~8s)</option>
-                        <option value="standard" selected class="bg-[#0e111a]">GP Estándar (~14s)</option>
-                        <option value="endurance" class="bg-[#0e111a]">Le Mans Emoción (~22s)</option>
+                        <option value="sprint" class="bg-[#0e111a]">Sprint Rápido (~16s)</option>
+                        <option value="standard" selected class="bg-[#0e111a]">GP Estándar (~28s)</option>
+                        <option value="endurance" class="bg-[#0e111a]">Le Mans Emoción (~44s)</option>
                     </select>
                 </div>
 
@@ -458,7 +458,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 <!-- Partner 1: Instant Gaming -->
                 <div class="hud-panel rounded-2xl p-5 border border-[#ff5400]/40 hover:border-[#ff5400] transition flex flex-col justify-between relative overflow-hidden group">
                     <div class="absolute -right-8 -top-8 w-28 h-28 bg-[#ff5400]/10 rounded-full blur-xl group-hover:bg-[#ff5400]/20 transition"></div>
@@ -468,14 +468,30 @@
                             <i class="fa-solid fa-fire-flame-curved text-2xl text-[#ff5400]"></i>
                         </div>
                         <h4 class="font-hud font-bold text-lg text-white mb-1">Juegos más baratos en Instant Gaming</h4>
-                        <p class="text-sm text-gray-300 mb-4">¡Si quieres ayudar al canal, compra tus juegos de PC, DLCs de Le Mans Ultimate y tarjetas prepago usando nuestro enlace oficial!</p>
+                        <p class="text-sm text-gray-300 mb-4">¡Si quieres ayudar al canal, compra tus juegos de PC, DLCs de LMU y tarjetas prepago usando nuestro enlace oficial!</p>
                     </div>
                     <a href="https://www.instant-gaming.com/es/?igr=rastaig" target="_blank" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#ff5400] to-[#ff1e38] text-white font-hud font-bold text-xs uppercase tracking-wider text-center hover:brightness-110 transition shadow-lg">
-                        <i class="fa-solid fa-cart-shopping mr-1.5"></i> Comprar con Enlace RastaIG
+                        <i class="fa-solid fa-cart-shopping mr-1.5"></i> Comprar con RastaIG
                     </a>
                 </div>
 
-                <!-- Partner 2: Promoción iRacing Referido -->
+                <!-- Partner 2: The French Sim Racer -->
+                <div class="hud-panel rounded-2xl p-5 border border-[#00e5ff]/40 hover:border-[#00e5ff] transition flex flex-col justify-between relative overflow-hidden group">
+                    <div class="absolute -right-8 -top-8 w-28 h-28 bg-[#00e5ff]/10 rounded-full blur-xl group-hover:bg-[#00e5ff]/20 transition"></div>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 rounded-md bg-[#00e5ff]/20 text-[#00e5ff] font-hud font-bold text-xs">SIMRACING GEAR</span>
+                            <i class="fa-solid fa-steering-wheel text-2xl text-[#00e5ff]"></i>
+                        </div>
+                        <h4 class="font-hud font-bold text-lg text-white mb-1">The French Sim Racer</h4>
+                        <p class="text-sm text-gray-300 mb-4">Equipamiento, volantes y accesorios de alta gama para simracing. Apoya al canal usando nuestro enlace oficial:</p>
+                    </div>
+                    <a href="https://thefrenchsimracer.com/?ref=RASTARACING" target="_blank" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#00e5ff] to-[#9146ff] text-white font-hud font-bold text-xs uppercase tracking-wider text-center hover:brightness-110 transition shadow-lg">
+                        <i class="fa-solid fa-gauge-high mr-1.5"></i> Visitar Tienda
+                    </a>
+                </div>
+
+                <!-- Partner 3: Promoción iRacing Referido -->
                 <div class="hud-panel rounded-2xl p-5 border border-[#00ff66]/40 hover:border-[#00ff66] transition flex flex-col justify-between relative overflow-hidden group">
                     <div class="absolute -right-8 -top-8 w-28 h-28 bg-[#00ff66]/10 rounded-full blur-xl group-hover:bg-[#00ff66]/20 transition"></div>
                     <div>
@@ -484,7 +500,7 @@
                             <i class="fa-solid fa-flag-checkered text-2xl text-[#00ff66]"></i>
                         </div>
                         <h4 class="font-hud font-bold text-lg text-white mb-1">Promoción Oficial iRacing + Referido</h4>
-                        <p class="text-sm text-gray-300 mb-3">¿Te das de alta en iRacing? Usa el enlace promocional y pon el correo del canal como referido al crear tu cuenta:</p>
+                        <p class="text-sm text-gray-300 mb-3">¿Te das de alta en iRacing? Pon el correo del canal como referido al crear tu cuenta:</p>
                         <div class="flex items-center justify-between bg-black/60 border border-white/15 rounded-lg px-3 py-1.5 mb-3">
                             <code class="text-xs text-[#ffcc00] font-bold">rastaracing83@gmail.com</code>
                             <button onclick="copyReferralEmail()" id="copy-email-btn" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white font-semibold transition">
@@ -493,11 +509,11 @@
                         </div>
                     </div>
                     <a href="https://www.iracing.com/usac/" target="_blank" class="w-full py-2.5 px-4 rounded-xl bg-[#00ff66] text-black font-hud font-bold text-xs uppercase tracking-wider text-center hover:bg-[#00cc52] transition">
-                        <i class="fa-solid fa-arrow-up-right-from-square mr-1.5"></i> Ir a Promoción iRacing
+                        <i class="fa-solid fa-arrow-up-right-from-square mr-1.5"></i> Ir a iRacing USAC
                     </a>
                 </div>
 
-                <!-- Partner 3: Comunidad & Contacto -->
+                <!-- Partner 4: Comunidad & Contacto -->
                 <div class="hud-panel rounded-2xl p-5 border border-[#9146ff]/40 hover:border-[#9146ff] transition flex flex-col justify-between relative overflow-hidden group">
                     <div class="absolute -right-8 -top-8 w-28 h-28 bg-[#9146ff]/10 rounded-full blur-xl group-hover:bg-[#9146ff]/20 transition"></div>
                     <div>
@@ -506,10 +522,10 @@
                             <i class="fa-solid fa-headset text-2xl text-[#9146ff]"></i>
                         </div>
                         <h4 class="font-hud font-bold text-lg text-white mb-1">Únete al Paddock de RastaRacing</h4>
-                        <p class="text-sm text-gray-300 mb-3">Entra al Discord oficial para enterarte de todas las carreras de LMU, setups, sorteos y eventos en vivo.</p>
+                        <p class="text-sm text-gray-300 mb-3">Entra al Discord oficial para enterarte de todas las carreras, setups y eventos.</p>
                         <div class="text-xs text-gray-400 mb-3 flex items-center gap-2">
                             <i class="fa-solid fa-envelope text-[#ffcc00]"></i>
-                            <span>Contacto comercial: <strong class="text-white">rastaracing83@gmail.com</strong></span>
+                            <span>Contacto: <strong class="text-white">rastaracing83@gmail.com</strong></span>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -901,7 +917,7 @@
             }, 3400);
         }
 
-        // Bucle principal de físicas y telemetría de la carrera
+        // Bucle principal de físicas y telemetría de la carrera (Tiempos duplicados: multiplicadores divididos a la mitad)
         function updateRaceLoop(now) {
             if (!isRacing) return;
 
@@ -909,7 +925,7 @@
             document.getElementById('race-timer').textContent = (elapsed / 1000).toFixed(3) + 's';
 
             const durationMode = document.getElementById('race-duration').value;
-            const speedMultiplier = durationMode === 'sprint' ? 0.25 : durationMode === 'standard' ? 0.14 : 0.09;
+            const speedMultiplier = durationMode === 'sprint' ? 0.125 : durationMode === 'standard' ? 0.07 : 0.045;
 
             const laneContainer = document.getElementById('lanes-render-area');
             const trackWidth = laneContainer.clientWidth;
